@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CF Shortlink</title>
+    <style>
+      body { font-family: system-ui, -apple-system, sans-serif; max-width: 640px; margin: 2rem auto; padding: 1rem; line-height: 1.6; }
+      form { display: flex; gap: 0.5rem; flex-direction: column; }
+      input, textarea, button { padding: 0.75rem; font-size: 1rem; }
+      button { cursor: pointer; background: #2563eb; color: #fff; border: none; border-radius: 8px; }
+      .hidden { display: none; }
+      .card { border: 1px solid #e5e7eb; padding: 1rem; border-radius: 12px; }
+      .modal { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; padding: 1rem; }
+      .modal-content { background: #fff; border-radius: 12px; max-width: 480px; width: 100%; padding: 1.5rem; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1); }
+      .short-url { word-break: break-all; margin: 0.5rem 0 1rem; font-weight: 600; }
+      .actions { display: flex; gap: 0.5rem; }
+      .secondary { background: #e5e7eb; color: #111827; }
+    </style>
+  </head>
+  <body>
+    <h1>Cloudflare 短链接</h1>
+    <p>匿名用户可无限次创建短链接，生成后不可修改或删除。</p>
+
+    <form id="form" class="card">
+      <label>
+        目标地址：
+        <input type="url" name="url" placeholder="https://example.com" required />
+      </label>
+      <label>
+        备注（可选）：
+        <textarea name="note" rows="2" placeholder="留下一句备注，方便管理员"></textarea>
+      </label>
+      <button type="submit">生成短链接</button>
+      <p id="message"></p>
+    </form>
+
+    <div id="modal" class="modal hidden" role="dialog" aria-modal="true">
+      <div class="modal-content">
+        <h2>短链接已生成</h2>
+        <p id="short-url-text" class="short-url"></p>
+        <div class="actions">
+          <button id="copy-btn" type="button">复制链接</button>
+          <button id="close-btn" type="button" class="secondary">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const form = document.getElementById('form');
+      const message = document.getElementById('message');
+      const modal = document.getElementById('modal');
+      const copyBtn = document.getElementById('copy-btn');
+      const closeBtn = document.getElementById('close-btn');
+      const shortUrlText = document.getElementById('short-url-text');
+
+      form?.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        message.textContent = '';
+        const data = new FormData(form);
+        const url = data.get('url');
+        const note = data.get('note');
+
+        try {
+          const res = await fetch('/api/create', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ url, note }),
+          });
+
+          if (!res.ok) {
+            const error = await res.json().catch(() => ({}));
+            throw new Error(error.error || '创建失败');
+          }
+
+          const payload = await res.json();
+          const shortUrl = `${window.location.origin}/${payload.code}`;
+          shortUrlText.textContent = shortUrl;
+          modal.classList.remove('hidden');
+          message.textContent = '';
+        } catch (error) {
+          message.textContent = error.message;
+        }
+      });
+
+      copyBtn?.addEventListener('click', async () => {
+        const text = shortUrlText?.textContent?.trim();
+        if (!text) return;
+        try {
+          await navigator.clipboard.writeText(text);
+          message.textContent = '已复制到剪贴板';
+        } catch (error) {
+          message.textContent = '复制失败，请手动复制';
+        }
+      });
+
+      const closeModal = () => {
+        modal.classList.add('hidden');
+      };
+
+      closeBtn?.addEventListener('click', closeModal);
+      modal?.addEventListener('click', (event) => {
+        if (event.target === modal) closeModal();
+      });
+    </script>
+  </body>
+</html>

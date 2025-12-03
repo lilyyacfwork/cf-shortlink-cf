@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>短链接后台</title>
+    <style>
+      body { font-family: system-ui, -apple-system, sans-serif; max-width: 960px; margin: 2rem auto; padding: 1rem; line-height: 1.6; }
+      table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+      th, td { border: 1px solid #e5e7eb; padding: 0.5rem; text-align: left; }
+      button { padding: 0.5rem 0.75rem; margin-right: 0.25rem; cursor: pointer; }
+      input, textarea { width: 100%; padding: 0.5rem; }
+      .row-actions { white-space: nowrap; }
+    </style>
+  </head>
+  <body>
+    <h1>后台管理</h1>
+    <p>使用 Bearer Token 进行管理，令牌由环境变量 ADMIN_TOKEN 提供。</p>
+
+    <label>
+      管理员 Token：
+      <input type="password" id="token" placeholder="粘贴 ADMIN_TOKEN" />
+    </label>
+    <button id="save">保存 Token</button>
+    <button id="load">刷新数据</button>
+    <p id="message"></p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Code</th>
+          <th>目标</th>
+          <th>备注</th>
+          <th>状态</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+
+    <script>
+      const rows = document.getElementById('rows');
+      const message = document.getElementById('message');
+      const tokenInput = document.getElementById('token');
+
+      tokenInput.value = localStorage.getItem('ADMIN_TOKEN') || '';
+
+      document.getElementById('save').addEventListener('click', () => {
+        localStorage.setItem('ADMIN_TOKEN', tokenInput.value);
+        message.textContent = 'Token 已保存';
+      });
+
+      document.getElementById('load').addEventListener('click', load);
+
+      async function load() {
+        message.textContent = '';
+        rows.innerHTML = '';
+        const token = localStorage.getItem('ADMIN_TOKEN');
+        if (!token) {
+          message.textContent = '请先填写 Token';
+          return;
+        }
+
+        try {
+          const res = await fetch('/api/admin/links', {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!res.ok) throw new Error('加载失败');
+          const payload = await res.json();
+          payload.data.forEach(drawRow);
+          message.textContent = `共 ${payload.total} 条，当前 ${payload.page}/${Math.ceil(payload.total / payload.pageSize)}`;
+        } catch (error) {
+          message.textContent = error.message;
+        }
+      }
+
+      function drawRow(link) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${link.id}</td>
+          <td>${link.code}</td>
+          <td><input value="${link.target_url}" data-field="target_url"></td>
+          <td><textarea data-field="note">${link.note || ''}</textarea></td>
+          <td>${link.is_active ? '启用' : '停用'}</td>
+          <td class="row-actions"></td>
+        `;
+
+        const actions = tr.querySelector('.row-actions');
+        const saveBtn = document.createElement('button');
+        saveBtn.textContent = '保存';
+        saveBtn.onclick = () => save(link.id, tr);
+
+        const toggleBtn = document.createElement('button');
+        toggleBtn.textContent = link.is_active ? '停用' : '启用';
+        toggleBtn.onclick = () => toggle(link, tr);
+
+        const delBtn = document.createElement('button');
+        delBtn.textContent = '删除';
+        delBtn.onclick = () => remove(link.id);
+
+        actions.append(saveBtn, toggleBtn, delBtn);
+        rows.appendChild(tr);
+      }
+
+      async function save(id, tr) {
+        const token = localStorage.getItem('ADMIN_TOKEN');
+        const payload = collectPayload(tr);
+        await request(`/api/admin/links/${id}`, 'PATCH', payload, token);
+        await load();
+      }
+
+      async function toggle(link, tr) {
+        const token = localStorage.getItem('ADMIN_TOKEN');
+        await request(`/api/admin/links/${link.id}`, 'PATCH', { is_active: !link.is_active }, token);
+        await load();
+      }
+
+      async function remove(id) {
+        const token = localStorage.getItem('ADMIN_TOKEN');
+        await request(`/api/admin/links/${id}`, 'DELETE', null, token);
+        await load();
+      }
+
+      function collectPayload(tr) {
+        const target = tr.querySelector('[data-field="target_url"]').value;
+        const note = tr.querySelector('[data-field="note"]').value;
+        return { target_url: target, note };
+      }
+
+      async function request(url, method, body, token) {
+        const res = await fetch(url, {
+          method,
+          headers: {
+            'content-type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: body ? JSON.stringify(body) : undefined,
+        });
+        if (!res.ok) {
+          const error = await res.json().catch(() => ({}));
+          throw new Error(error.error || '请求失败');
+        }
+        return res.json();
+      }
+
+      load();
+    </script>
+  </body>
+</html>

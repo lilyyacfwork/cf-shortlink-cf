@@ -1,0 +1,11 @@
+name = "cf-shortlink-cf"
+main = "worker/src/index.ts"
+compatibility_date = "2024-10-22"
+
+[observability]
+enabled = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "shortlinks"
+database_id = "bcc43c9d-1968-411d-b1ff-c84ad8990494"

@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>短链接已生成</title>
+    <style>
+      body { font-family: system-ui, -apple-system, sans-serif; max-width: 640px; margin: 2rem auto; padding: 1rem; line-height: 1.6; }
+      .card { border: 1px solid #e5e7eb; padding: 1rem; border-radius: 12px; }
+      a { color: #2563eb; }
+      button { padding: 0.75rem 1rem; background: #2563eb; color: #fff; border: none; border-radius: 8px; cursor: pointer; margin-top: 0.5rem; }
+    </style>
+  </head>
+  <body>
+    <h1>短链接已生成</h1>
+    <div class="card">
+      <p>你的短码：<strong id="code"></strong></p>
+      <p>
+        打开：
+        <a id="short-url" href="#" target="_blank" rel="noopener noreferrer"></a>
+      </p>
+      <button id="copy-btn" type="button">复制短链接</button>
+      <p id="status"></p>
+    </div>
+    <p><a href="/">返回首页</a></p>
+
+    <script>
+      const url = new URL(window.location.href);
+      const code = url.searchParams.get('code');
+      const codeNode = document.getElementById('code');
+      const linkNode = document.getElementById('short-url');
+      const copyBtn = document.getElementById('copy-btn');
+      const status = document.getElementById('status');
+
+      if (code) {
+        codeNode.textContent = code;
+        const shortUrl = `${window.location.origin}/${code}`;
+        linkNode.textContent = shortUrl;
+        linkNode.href = shortUrl;
+        copyBtn?.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(shortUrl);
+            status.textContent = '已复制到剪贴板';
+          } catch (error) {
+            status.textContent = '复制失败，请手动复制链接';
+          }
+        });
+      } else {
+        codeNode.textContent = '未找到短码';
+      }
+    </script>
+  </body>
+</html>
